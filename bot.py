@@ -13,6 +13,10 @@ def circles_sort(circle: list) -> list:
     return sorted(circle, key=lambda d: d[-1], reverse=True)
 
 
+def circles_sort_p2p(circle):
+    return sorted(circle, key=lambda d: d["spred"], reverse=True)
+
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bot.send_message(message.chat.id, messages["start_message"].format(message.from_user.first_name))
@@ -27,7 +31,7 @@ def send_help(message):
 def search_spreads(message):
     start_time = time.time()
     bot.send_message(message.chat.id, messages["search_spreads_message"])
-    trade = TriangularArbitration("USDT")
+    trade = TriangularArbitration("ETH")
     circles = trade.find_spreads()
     circles = circles_sort(circles)
     for circle in circles[:5]:
@@ -43,4 +47,30 @@ def search_spreads(message):
     bot.send_message(message.chat.id, "--- %s seconds ---" % (time.time() - start_time))
 
 
-bot.infinity_polling()
+@bot.message_handler(commands=['search_spreads_p2p'])
+def search_spreads_p2p(message):
+    start_time = time.time()
+    bot.send_message(message.chat.id, messages["search_spred_p2p_message"],)
+    trade = TriangularArbitration("USDT")
+    circles = trade.find_p2p()
+    for circle in circles[:5]:
+        print(circle)
+        buy = circle["BUY"]
+        sell = circle["SELL"]
+
+        buy_asset = buy["asset"]
+        buy_price = buy["price"]
+        buy_banks = " ИЛИ ".join(buy["banks"])
+
+        sell_price = sell["price"]
+        sell_banks = " ИЛИ ".join(sell["banks"])
+
+        spred = str(round(circle["SPRED"], 2)) + "%"
+        userNo = f'https://p2p.binance.com/ru/advertiserDetail?advertiserNo={buy["advertiserNo"]}'
+        text = messages["spred_p2p_message"].format(buy_banks, buy_asset, buy_price, sell_banks, sell_price, spred, userNo)
+        bot.send_message(message.chat.id, text, parse_mode="MarkdownV2", disable_web_page_preview=True)
+    bot.delete_message(message.chat.id, message.id + 1)
+    bot.send_message(message.chat.id, "--- %s seconds ---" % (time.time() - start_time))
+
+
+bot.polling()

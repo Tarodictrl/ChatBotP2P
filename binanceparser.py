@@ -1,9 +1,11 @@
 from binance import Client
 from config import *
+import requests
+import threading
 
 
 class TriangularArbitration:
-    def __init__(self, start_quote: str, start_count: int = 1000):
+    def __init__(self, start_quote: str, start_count: int = 100000):
         self._client = Client(API_KEY, SECRET_KEY)
         self._start_quote = start_quote
         self._comission = 0.1
@@ -12,6 +14,11 @@ class TriangularArbitration:
         self._connexions = self.get_connexions(self._start_quote)
         self._all_connexions = [con["symbol"] for con in self._symbols]
         self._prices = self.get_prices()
+        self._res = []
+        self.session = requests.Session()
+
+    def get(self, data):
+        self._res.append(self.session.post(URL_P2P, headers=headers, json=data).json())
 
     def base_to_quote(self, base_value, bid) -> float:
         base_value = float(base_value)
@@ -72,6 +79,71 @@ class TriangularArbitration:
                 array[1] = symbol
 
         return array
+
+    def find_p2p(self):
+        advs = []
+        json_data = []
+        self._res = []
+        for asset in ASSETS:
+            for bank in BANKS:
+                data = data_buy.copy()
+                data["payTypes"] = [bank]
+                data["asset"] = asset
+                json_data.append(data)
+        th = []
+        for data in json_data:
+            t = threading.Thread(target=self.get, args=(data,))
+            t.start()
+            th.append(t)
+        for t in th:
+            t.join()
+        for r in self._res:
+            r_data = r["data"]
+            if len(r_data) == 0: continue
+            adv = r_data[0]
+            advs.append(adv)
+        advs = sorted(advs, key=lambda x: x["adv"]["price"])
+        offers = []
+        for i, advertisers1 in enumerate(advs):
+            price1 = float(advertisers1["adv"]["price"])
+            ass = advertisers1["adv"]["asset"]
+            max_single_trans_amount = float(advertisers1["adv"]["maxSingleTransAmount"])
+            min_single_trans_amount = float(advertisers1["adv"]["minSingleTransAmount"])
+            advertiserNo1 = advertisers1["advertiser"]["userNo"]
+            if min_single_trans_amount <= self._start_count <= max_single_trans_amount:
+                banks1 = [x["tradeMethodName"] for x in advertisers1["adv"]["tradeMethods"]]
+                for asset2 in range(i + 1, len(advs)):
+                    advertisers2 = advs[asset2]["adv"]
+                    advertiserNo2 = advs[asset2]["advertiser"]["userNo"]
+                    ass2 = advertisers2["asset"]
+                    if ass2 == ass:
+                        banks2 = [x["tradeMethodName"] for x in advertisers2["tradeMethods"]]
+                        if all(x not in banks1 for x in banks2):
+                            price2 = float(advertisers2["price"])
+                            count_buy = self._start_count / price1
+                            count_sell = (count_buy * price2) - (count_buy * comission_p2p)
+                            spred = 100 * float(count_sell - self._start_count) / float(self._start_count)
+                            offer = {
+                                "BUY": {
+                                    "asset": ass,
+                                    "price": price1,
+                                    "banks": banks1,
+                                    "balance": count_buy,
+                                    "advertiserNo": advertiserNo1
+                                },
+                                "SELL": {
+                                    "asset": ass2,
+                                    "price": price2,
+                                    "banks": banks2,
+                                    "balance": count_sell,
+                                    "advertiserNo": advertiserNo2
+                                },
+                                "SPRED": spred
+                            }
+                            if offer not in offers:
+                                offers.append(offer)
+        offers = sorted(offers, key=lambda d: d["SPRED"], reverse=True)
+        return offers
 
     def find_spreads(self):
         self._prices = self.get_prices()
