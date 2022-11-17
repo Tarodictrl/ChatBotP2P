@@ -1,51 +1,51 @@
 from binance import Client
-from config import *
+import config
 import requests
 import threading
 
 
 class TriangularArbitration:
     def __init__(self, start_quote: str, start_count: int = 100000):
-        self._client = Client(API_KEY, SECRET_KEY)
+        self._client = Client(config.API_KEY, config.SECRET_KEY)
         self._start_quote = start_quote
         self._comission = 0.1
         self._start_count = start_count
-        self._symbols = self.get_symbols()
-        self._connexions = self.get_connexions(self._start_quote)
+        self._symbols = self._get_symbols()
+        self.connexions = self._get_connexions(self._start_quote)
         self._all_connexions = [con["symbol"] for con in self._symbols]
-        self._prices = self.get_prices()
+        self._prices = self._get_prices()
         self._res = []
-        self.session = requests.Session()
+        self._session = requests.Session()
 
-    def get(self, data):
-        self._res.append(self.session.post(URL_P2P, headers=headers, json=data).json())
+    def _get(self, data):
+        self._res.append(self._session.post(config.URL_P2P, headers=config.headers, json=data).json())
 
-    def base_to_quote(self, base_value, bid) -> float:
+    def _base_to_quote(self, base_value, bid) -> float:
         base_value = float(base_value)
         bid = float(bid)
         full_comission = base_value / 100 * self._comission
         return bid * (base_value - full_comission)
 
-    def quote_to_base(self, quote_value, ask) -> float:
+    def _quote_to_base(self, quote_value, ask) -> float:
         quote_value = float(quote_value)
         ask = float(ask)
         full_comission = quote_value / 100 * self._comission
         return (quote_value - full_comission) / ask
 
-    def get_symbols(self) -> list:
+    def _get_symbols(self) -> list:
         return self._client.get_exchange_info()["symbols"]
 
-    def get_prices(self) -> dict:
+    def _get_prices(self) -> dict:
         return self._client.get_orderbook_tickers()
 
-    def get_connexions(self, quote) -> list:
+    def _get_connexions(self, quote) -> list:
         array = []
         for symbol in self._symbols:
             if symbol["quoteAsset"] == quote:
                 array.append(symbol["baseAsset"] + "/" + symbol["quoteAsset"])
         return array
 
-    def find_orderbook_ticker(self, symbols: list):
+    def _find_orderbook_ticker(self, symbols: list):
         array = []
         for price in self._prices:
             if price["symbol"] in symbols:
@@ -54,13 +54,13 @@ class TriangularArbitration:
 
     def get_circles(self):
         circles = []
-        for con in self._connexions:
+        for con in self.connexions:
             base, quote = con.split("/")
-            for con2 in self.get_connexions(base):
+            for con2 in self._get_connexions(base):
                 base2, quote2 = con2.split("/")
                 if base2 + self._start_quote not in self._all_connexions: continue
                 symbols = [base + quote, base2 + quote2, base2 + self._start_quote]
-                circle = self.find_orderbook_ticker(symbols)
+                circle = self._find_orderbook_ticker(symbols)
                 circles.append(circle)
         return circles
 
@@ -84,15 +84,15 @@ class TriangularArbitration:
         advs = []
         json_data = []
         self._res = []
-        for asset in ASSETS:
-            for bank in BANKS:
-                data = data_buy.copy()
+        for asset in config.ASSETS:
+            for bank in config.BANKS:
+                data = config.data_buy.copy()
                 data["payTypes"] = [bank]
                 data["asset"] = asset
                 json_data.append(data)
         th = []
         for data in json_data:
-            t = threading.Thread(target=self.get, args=(data,))
+            t = threading.Thread(target=self._get, args=(data,))
             t.start()
             th.append(t)
         for t in th:
@@ -121,7 +121,7 @@ class TriangularArbitration:
                         if all(x not in banks1 for x in banks2):
                             price2 = float(advertisers2["price"])
                             count_buy = self._start_count / price1
-                            count_sell = (count_buy * price2) - (count_buy * comission_p2p)
+                            count_sell = (count_buy * price2) - (count_buy * config.COMISSION_P2P)
                             spred = 100 * float(count_sell - self._start_count) / float(self._start_count)
                             offer = {
                                 "BUY": {
@@ -146,7 +146,7 @@ class TriangularArbitration:
         return offers
 
     def find_spreads(self):
-        self._prices = self.get_prices()
+        self._prices = self._get_prices()
         trades = []
         circles = self.get_circles()
         for circle in circles:
@@ -160,15 +160,15 @@ class TriangularArbitration:
                     ask = float(symbol["askPrice"])
                     if i == 0:
                         base1 = symbol["symbol"].replace(self._start_quote, "")
-                        count = self.quote_to_base(count, ask)
+                        count = self._quote_to_base(count, ask)
                     elif i == 1:
                         if symbol["symbol"].startswith(base1):
-                            count = self.base_to_quote(count, bid)
+                            count = self._base_to_quote(count, bid)
                         else:
-                            count = self.quote_to_base(count, ask)
+                            count = self._quote_to_base(count, ask)
                     elif i == 2:
-                        count = self.base_to_quote(count, bid)
+                        count = self._base_to_quote(count, bid)
             spred = 100 * float(count - self._start_count) / float(self._start_count)
             c.append(spred)
             trades.append(c)
-        return trades
+        return sorted(trades, key=lambda d: d[-1], reverse=True)
