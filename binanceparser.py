@@ -1,7 +1,9 @@
-from binance import Client
-import config
-import requests
 import threading
+
+import requests
+from binance import Client
+
+import config
 
 
 class TriangularArbitration:
@@ -18,27 +20,45 @@ class TriangularArbitration:
         self._session = requests.Session()
 
     def _get(self, data):
+        """
+        Функция для получения данных с сервера
+        """
         self._res.append(self._session.post(config.URL_P2P, headers=config.headers, json=data).json())
 
     def _base_to_quote(self, base_value, bid) -> float:
+        """
+        Функция для перевода базовой валюты в котируемую.
+        """
         base_value = float(base_value)
         bid = float(bid)
         full_comission = base_value / 100 * self._comission
         return bid * (base_value - full_comission)
 
     def _quote_to_base(self, quote_value, ask) -> float:
+        """
+        Функция для перевода котируемой валюты в базовую.
+        """
         quote_value = float(quote_value)
         ask = float(ask)
         full_comission = quote_value / 100 * self._comission
         return (quote_value - full_comission) / ask
 
     def _get_symbols(self) -> list:
+        """
+        Функция для получения всех доступных пар.
+        """
         return self._client.get_exchange_info()["symbols"]
 
     def _get_prices(self) -> dict:
+        """
+        Функция для получения всех цен.
+        """
         return self._client.get_orderbook_tickers()
 
     def _get_connexions(self, quote) -> list:
+        """
+        Функция для получения всех возможных соединений.
+        """
         array = []
         for symbol in self._symbols:
             if symbol["quoteAsset"] == quote:
@@ -46,6 +66,9 @@ class TriangularArbitration:
         return array
 
     def _find_orderbook_ticker(self, symbols: list):
+        """
+        Функция для поиска цен по заданным символам.
+        """
         array = []
         for price in self._prices:
             if price["symbol"] in symbols:
@@ -53,6 +76,9 @@ class TriangularArbitration:
         return array
 
     def get_circles(self):
+        """
+        Функция для получения всех возможных кругов.
+        """
         circles = []
         for con in self.connexions:
             base, quote = con.split("/")
@@ -65,6 +91,9 @@ class TriangularArbitration:
         return circles
 
     def normalize_circle(self, circle):
+        """
+        Функция для нормализации круга.
+        """
         array = [0.0] * 3
         for symbol in circle:
             bid = float(symbol["bidPrice"])
@@ -81,6 +110,9 @@ class TriangularArbitration:
         return array
 
     def find_p2p(self):
+        """
+        Функция для поиска покупок и продаж на P2P.
+        """
         advs = []
         json_data = []
         self._res = []
@@ -146,10 +178,14 @@ class TriangularArbitration:
         return offers
 
     def find_spreads(self):
+        """
+        Функция для поиска спредов.
+        """
         self._prices = self._get_prices()
         trades = []
         circles = self.get_circles()
         for circle in circles:
+            print(circle)
             c = self.normalize_circle(circle)
             count = self._start_count
             base1 = ""

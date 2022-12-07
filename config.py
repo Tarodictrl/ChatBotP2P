@@ -1,8 +1,8 @@
 import json
 
-API_KEY = "tWoRZ5wUN0JDoMyzpc4FGm0KI2Aex5vnI55upSsaZGtSZ7W2mZ7OrX2enleeSvIY"
-SECRET_KEY = "JyY0N1H3g8B05M0zYxve5Om56OBvICZMAUVCoeBrmvkyyqpohD58IKGm6s6RjsTh"
-BOT_TOKEN = "5647535683:AAGFPSi6mEhAcT0DlKjgfzomHJthtAGV4AQ"
+API_KEY = ""
+SECRET_KEY = ""
+BOT_TOKEN = ""
 
 headers = {
     "Accept": "*/*",
@@ -31,11 +31,10 @@ data_buy = {
 }
 
 BANKS = ["YandexMoneyNew", "RosBankNew", "HomeCreditBank", "RaiffeisenBank", "TinkoffNew", "RosBankNew", "MTSBank",
-         "UralsibBank",
-         "QIWI"]
+         "UralsibBank", "PostBankNew", "QIWI"]
 
 ASSETS = ["BTC", "USDT", "BNB", "BUSD"]
-
+STABLE = ["USDT", "BUSD"]
 FIAT = "RUB"
 
 COMISSION_P2P = 0.1
